@@ -1,7 +1,11 @@
-
+#standard imports
 import logging
 from numpy import *
+
+#project related imports
 from pebbles import *
+
+
 
 class graph():
 	"""
@@ -22,8 +26,7 @@ class graph():
 		self.my_graph = zeros((vertices, vertices))
 		
 		self.leader_id = None
-		#dictionary
-		self.ID_index_dict = {myBt : 0}
+		self.min_graph = None
 	
 	#----------------------------------#
 	#  Testing for certain properties  #
@@ -88,19 +91,31 @@ class graph():
 	#  Graph manipulation  #
 	#----------------------#		
 		
-	def set_graph(self, graph):
+	def set_graph(self, array):
 		"""
 		Sets the graph
 		"""
-		self.my_graph = graph
-		# TODO check if graph is directed
+		self.my_graph = array
+
+		#get number of vertices
+		self.vertices = min(array.shape)
+
+		# count directed and undirected edges
 		self._get_number_of_edges()
 		
+		self.min_graph = None
 		
 		# TODO if directed, get leader
-		return
+		return True
 		
+
 	def get_minimally_rigid_graph(self):
+
+		if (self.min_graph is None):		
+			# get min_graph
+			#TODO
+
+			self.min_graph = temp_graph
 		return self.min_graph
 		
 	#-----------------------#
