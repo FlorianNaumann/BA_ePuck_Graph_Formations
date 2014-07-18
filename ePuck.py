@@ -125,7 +125,7 @@ class ePuck():
 		self._camera_parameters = (0, 0, 0, 0)
 		self._floor_sensors = (0, 0, 0)
 		self._proximity = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-		self._light_sensor = (0, 0, 0, 0, 0, 0, 0, 0)
+		self._light_sensor = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 	#	self._microphone = (0, 0, 0)
 		self._pil_image = None
 
@@ -261,15 +261,15 @@ class ePuck():
 		for m in actuators:
 			if m[0] == 'L':
 				# Leds
-				msg = struct.pack('<bbb', -ord(m[0]), m[1], m[2])
+				msg = struct.pack('<bbb', -ord(m[0]), m[1], m[2], 0)
 				n = self._send(msg)
-				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bbb', msg)))
+				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bbbb', msg)))
 
 			elif m[0] == 'D' or m[0] == 'P':
 				# Set motor speed or set motor position
-				msg = struct.pack('<bhh', -ord(m[0]), m[1], m[2])
+				msg = struct.pack('<bhh', -ord(m[0]), m[1], m[2], 0)
 				n = self._send(msg)
-				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bhh', msg)))
+				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bhhb', msg)))
 
 			else:
 				# Others actuators, parameters are separated by commas
@@ -352,7 +352,7 @@ class ePuck():
 
 			elif s == 'o':
 				# Light sensors
-				parameters = ('O', 16, '@HHHHHHHH')
+				parameters = ('O', 20, '@HHHHHHHHHH')
 				reply = send_binary_mode(parameters)
 				if type(reply) is tuple and type(reply[0]) is int:
 					self._light_sensor = reply

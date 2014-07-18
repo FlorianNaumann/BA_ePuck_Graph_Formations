@@ -20,6 +20,10 @@ class graph():
 							
 		self.vertices = vertices
 		self.my_graph = zeros((vertices, vertices))
+		
+		self.leader_id = None
+		#dictionary
+		self.ID_index_dict = {myBt : 0}
 	
 	#----------------------------------#
 	#  Testing for certain properties  #
@@ -43,7 +47,7 @@ class graph():
 		else:
 			return False
 	
-	def is_persistent(self, graph): # = ready to roll!
+	def is_persistent(self): # = ready to roll!
 		if ( self.is_rigid() ) :
 			if ( self.vertices < 4 ) :
 				return true
@@ -53,17 +57,17 @@ class graph():
 			# persistence, if all subgraphs are persistent
 		return True
 		
-	def is_complete(self, graph):
-		if is_directed():
+	def is_complete(self):
+		if self.is_directed():
 			if (self.directed_edges == 0.5*self.vertices*(self.vertices-1)):
 				return True		
 		return False
 		
-	def is_directed(self, graph):
+	def is_directed(self):
 		if self.directed_edges == 0:
-			return True
-		else:
 			return False
+		else:
+			return True
 		
 	def _get_number_of_edges(self):
 		self.directed_edges=0;
@@ -96,7 +100,7 @@ class graph():
 		# TODO if directed, get leader
 		return
 		
-	def get_minimally_rigid_graph(self, graph):
+	def get_minimally_rigid_graph(self):
 		return self.min_graph
 		
 	#-----------------------#
@@ -106,7 +110,7 @@ class graph():
 	def get_size(self):
 		return self.vertices
 	
-	def set_leader(self):
+	def set_leader(self, ID):
 		
 		self.leader_id = ID
 		return
@@ -141,5 +145,8 @@ if __name__ == "__main__":
 	
 	test = graph(5)
 	test.set_graph(b)
-	print 'b.is_rigid()'
-	print test.is_rigid()
+	print 'b.get_size() =      ', test.get_size()
+	print 'b.get_leader_id() = ', test.get_leader_id()
+	print 'b.is_rigid() =      ', test.is_rigid()
+	print 'b.is_complete() =   ', test.is_complete()
+	print 'b.is_directed() =   ', test.is_directed()
