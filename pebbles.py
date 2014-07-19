@@ -4,9 +4,12 @@ DEBUG = False
 
 def pebble_algorithm(adjacency_matrix):
 
+	if not (type(adjacency_matrix).__module__ == 'numpy' and type(adjacency_matrix).__name__ == 'ndarray'):
+		return False
+
 	# ------------- intialization --------------
 	# get number of nodes
-	nodes = adjacency_matrix.shape[0]
+	nodes = min(adjacency_matrix.shape)
 	# get an empty table
 	pebtab = zeros((nodes,nodes))
 	edges=0
@@ -19,7 +22,7 @@ def pebble_algorithm(adjacency_matrix):
 			# pick new edge
 			edge = (v1, v2)
 			# check if that edge is part of the graph
-			if adjacency_matrix[edge]==0:
+			if adjacency_matrix[edge]<=0:
 				continue
 			
 			add_edge = True
@@ -117,7 +120,7 @@ if __name__ == "__main__":
 	# Adjacency matrices
 	# ------------------
 	#
-	#  a (not rigid)					#  b (rigid)
+	#  a (not rigid, uneven)			#  b (rigid)
 	# 	    A B C D E					# 	    A B C D E
 	#                                   #  
 	#  A    X 7 0 0 0 					#  A    X 1 0 0 1

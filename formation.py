@@ -81,3 +81,4 @@ if __name__ == "__main__":
 
 	test = formation(b)	
 	test.set_graph(b)
+	print 'successful'
