@@ -22,19 +22,8 @@ class graph():
 		#					filename='/logs/graph.log',
 		#					filemode='w'))
 		
-		self.Error = False
+		self.set_graph(zeros((vertices, vertices)))
 
-		self.vertices = vertices
-		self.my_graph = zeros((vertices, vertices))
-		
-		self.min_graph   = None
-		self.base_graph  = None
-
-		self.leader_id        = None
-		self.firstfollower_id = None
-		self.graph_is_rigid         = None
-		self.graph_is_persistent    = None
-	
 	#----------------------------------#
 	#  Testing for certain properties  #
 	#----------------------------------#	
@@ -77,17 +66,20 @@ class graph():
 			self.graph_is_persistent = False
 			# rigidity of the underlying undirected graph is necessary but not sufficient
 			if ( self.is_rigid() ) :
-				if ( self.vertices < 4 ) :
-					self.graph_is_persistent = True
-				else:
-					# ~~~~~ test for constraint consistence ~~~~~ #
-					# --- simple test for cycle-free or leader-follower structured graphs ---
-					# step 1) find the one leader (out-degree of 0)
-					# step 2) indentify the coleader (out-degree of 1 AND connection to the leader)
-					# step 3) every other vertex has to have more than 2 outgoing edge
-					if self._check_for_leader_follower() :
-						if (self.my_graph[(self.firstfollower_id, self.leader_id)] != 0) :
-							self.graph_is_persistent = True
+				if ( self.is_directed() ):
+					if ( self.vertices < 4 ) :
+						self.graph_is_persistent = True
+					else:
+						# TODO test for cycle-free
+						if self.is_cycle_free():
+							# ~~~~~ test for constraint consistence ~~~~~ #
+							# --- simple test for cycle-free or leader-follower structured graphs ---
+							# step 1) find the one leader (out-degree of 0)
+							# step 2) indentify the coleader (out-degree of 1 AND connection to the leader)
+							# step 3) every other vertex has to have more than 2 outgoing edge
+							if self._check_for_leader_follower() :
+								if (self.my_graph[(self.firstfollower_id, self.leader_id)] != 0) :
+									self.graph_is_persistent = True
 		return self.graph_is_persistent
 		
 
@@ -108,6 +100,42 @@ class graph():
 		else:
 			return True
 		
+	
+	def is_cycle_free(self):
+
+		def _DFS( g, vertex_index, visited, max_depth, path=(None,) ):
+
+			path = path + (vertex_index,)
+			visited = visited + (vertex_index,)
+
+			if max_depth>0: # if a deeper search is allowed
+				for vi2 in xrange(self.vertices): # then look for all outgoing connections
+					if( g[vertex_index][vi2] > 0 ):
+						if (vi2 in path): # cycle detected
+							return False
+						elif (vi2 not in visited): # cycle detected
+							visited = _DFS( g, vi2, visited, max_depth-1, path )
+							if visited == False :
+								break
+			return visited
+
+		if self.acyclic == None :
+			self.acyclic = True
+			# test for cycles with Tarjan's Algorithm (DFS)
+
+			vv = (None,) # visited vertices
+
+			for v in xrange(self.vertices):	
+				if ( v not in vv ):		
+					nv = _DFS(self.my_graph,v,vv,self.vertices)
+					if nv == False: # found cycle
+						self.acyclic = False
+						break
+					else:
+						vv = nv
+		
+		return self.acyclic
+
 
 	def _get_number_of_edges(self):
 		self.directed_edges=0;
@@ -150,6 +178,7 @@ class graph():
 		# reset saved properties		
 		self.leader_id        = None
 		self.firstfollower_id = None
+		self.acyclic          = None
 		self.graph_is_rigid         = None
 		self.graph_is_persistent    = None
 
@@ -294,6 +323,7 @@ if __name__ == "__main__":
 	print 'is_complete() =   ', test.is_complete()
 	print 'is_directed() =   ', test.is_directed()
 	print 'is_rigid() =      ', test.is_rigid()
+	print 'is_cycle_free() = ', test.is_cycle_free()
 	print 'is_persistent() = ', test.is_persistent()
 	print 'get_leader_id() = ', test.get_leader_id()
 	print g
