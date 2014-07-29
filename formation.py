@@ -1,12 +1,18 @@
+"""
+Graph ePuck framework:
+formation.py
+"""
+
+
 # standard imports
 import logging
 import numpy as np
 
 # project related imports
+from constants import *
 from graph import *
 
-#constants
-MY_BT = 1321
+
 
 
 class formation():
@@ -18,10 +24,11 @@ class formation():
 		if graph is not None :
 			if self.set_graph(graph) is not True:
 				raise TypeError('invalid type of graph')			
-		else:
+		else: 
 			self.my_graph = None
 				
 		# ID to table entry dictionary
+		# TODO role assignment with respect to the localization
 		self.ID_lookup = {MY_BT : 0, 1234 : 1}
 
 		return
@@ -35,7 +42,7 @@ class formation():
 				# we have an complete undirected graph
 				# henneberg sequence
 				pass
-
+		return
 
 	def set_graph(self, new_graph):
 		g = self._make_usable_graph(new_graph)

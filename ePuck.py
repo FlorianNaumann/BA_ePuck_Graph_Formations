@@ -37,6 +37,9 @@ __version__ = "1.2.2+gumstix-sercom-1+RL_local"
 __author__ = "Manuel Martin Ortiz / Martin Knopp / Sophia Schillai / Florian Naumann"
 __license__ = "GPL"
 
+#relative positioning parameter
+NUMBER_OF_ROBOTS = 4
+
 # This dictionary have as keys the first character of the message, that
 # is used to know the number of lines. If no key for the message, 1 line is assumed
 DIC_MSG = {
@@ -44,7 +47,8 @@ DIC_MSG = {
 	"\n": 23,  # Menu
 	"\x0c": 2,  # Welcome
 	"k": 3,  # Calibration
-	"R": 2  # Reset
+	"R": 2,  # Reset
+	"A": NUMBER_OF_ROBOTS	# Relative Positioning with 4 robots
 }
 
 # You have to use the keys of this dictionary for indicate on "enable" function
@@ -53,10 +57,11 @@ DIC_SENSORS = {
 #	"accelerometer" : "a",   currently disabled
 	"selector" : "c",
 	"motor_speed" : "e",
-	"camera" : "i",
+	"btID" : "i",
 	"floor"  : "m",
 	"proximity" : "n",
 	"light" : "o",
+	"relative_position" : "r",
 	"motor_position" : "q",
 #	"microphone" : "u"      currently disabled
 }
@@ -128,6 +133,7 @@ class ePuck():
 		self._light_sensor = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 	#	self._microphone = (0, 0, 0)
 		self._pil_image = None
+		self._rel_pos = (0, 0, 0, 0., 0) * NUMBER_OF_ROBOTS
 
 		# Leds
 		self._leds_status = [False] * 10
@@ -228,23 +234,23 @@ class ePuck():
 		except Exception, e:
 			self._debug('Problem receiving an image: ', e)
 
-	def _refresh_camera_parameters(self):
-		"""
-		Method for refresh the camera parameters, it's called for some
-		private methods
-		"""
-		try:
-			msg = self.send_and_receive("I").split(',')
-		except:
-			return False
-		else:
-			self._cam_mode, \
-			self._cam_width, \
-			self._cam_height, \
-			self._cam_zoom, \
-			self._cam_size = [int(i) for i in msg[1:6]]
-
-			self._camera_parameters = self._cam_mode, self._cam_width, self._cam_height, self._cam_zoom
+#	def _refresh_camera_parameters(self):
+#		"""
+#		Method for refresh the camera parameters, it's called for some
+#		private methods
+#		"""
+#		try:
+#			msg = self.send_and_receive("I").split(',')
+#		except:
+#			return False
+#		else:
+#			self._cam_mode, \
+#			self._cam_width, \
+#			self._cam_height, \
+#			self._cam_zoom, \
+#			self._cam_size = [int(i) for i in msg[1:6]]
+#
+#			self._camera_parameters = self._cam_mode, self._cam_width, self._cam_height, self._cam_zoom
 
 	def _write_actuators(self):
 		"""
@@ -261,13 +267,13 @@ class ePuck():
 		for m in actuators:
 			if m[0] == 'L':
 				# Leds
-				msg = struct.pack('<bbb', -ord(m[0]), m[1], m[2], 0)
+				msg = struct.pack('<bbbb', -ord(m[0]), m[1], m[2], 0)
 				n = self._send(msg)
 				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bbbb', msg)))
 
 			elif m[0] == 'D' or m[0] == 'P':
 				# Set motor speed or set motor position
-				msg = struct.pack('<bhh', -ord(m[0]), m[1], m[2], 0)
+				msg = struct.pack('<bhhb', -ord(m[0]), m[1], m[2], 0)
 				n = self._send(msg)
 				self._debug('Binary message sent of [' + str(n) + '] bytes: ' + str(struct.unpack('<bhhb', msg)))
 
@@ -313,7 +319,7 @@ class ePuck():
 		# Read differents sensors
 		for s in self._sensors_to_read:
 
-			#if s == 'a':
+			# if s == 'a':
 				# Accelerometer sensor in a non filtered way
 			#	if self._accelerometer_filtered:
 			#		parameters = ('A', 12, '@III')
@@ -327,7 +333,7 @@ class ePuck():
 
 			if s == 'n':
 				# Proximity sensors
-				parameters = ('N', 20, '@HHHHHHHHHH')
+				parameters = ('N', 16, '@HHHHHHHH')
 				reply = send_binary_mode(parameters)
 				if type(reply) is tuple and type(reply[0]) is int:
 					self._proximity = reply
@@ -350,9 +356,16 @@ class ePuck():
 				if type(reply) is tuple and type(reply[0]) is int:
 					self._motor_position = reply
 
+			elif s == 'r':
+				# relative positioning
+				parameters = ('A', 9*NUMBER_OF_ROBOTS, '='+'HBBBI'*NUMBER_OF_ROBOTS)
+				reply = send_binary_mode(parameters)
+				if type(reply) is tuple and type(reply[0]) is int:
+					self._rel_pos = reply
+
 			elif s == 'o':
 				# Light sensors
-				parameters = ('O', 20, '@HHHHHHHHHH')
+				parameters = ('O', 16, '@8H')
 				reply = send_binary_mode(parameters)
 				if type(reply) is tuple and type(reply[0]) is int:
 					self._light_sensor = reply
@@ -544,6 +557,20 @@ class ePuck():
 		"""
 		return self._selector
 
+
+	def get_btPin(self):
+		"""
+		Return the bluetooth Pin of the ePuck
+		
+		:return: bluetooth Pin
+		:rtype: int
+		"""
+		a = self.send_and_receive("i")
+		for s in a.split(','):
+			if s.isdigit():
+				r = int(s)
+		return r
+	
 	def get_motor_speed(self):
 		"""
 		Return the motor speed. Correct values are in the range [-1000, 1000]
@@ -955,22 +982,29 @@ class ePuck():
 		self._read_sensors()
 
 		# Get an image in 1 FPS
-		if self._cam_enable and time.time() - self.timestamp > 1:
-			self._read_image()
-			self.timestamp = time.time()
+		#if self._cam_enable and time.time() - self.timestamp > 1:
+		#	self._read_image()
+		#	self.timestamp = time.time()
 
 
 
 # receiving relative positioning information
-        def relative_position(self):
-                """
-                Method to update the relative positioning information
-                this robot has collected
-                """
+	def relative_position(self):
+		"""
+		Method to update the relative positioning information
+		this robot has collected
+		"""
 
-                if not self.conexion_status:
-                        raise Exception, 'There is no connection'
-                print "talk to robo"
-                reply = self.send_and_receive("A")
-                reply[0] = (int)reply[0]
-                print reply[0]
+		if not self.conexion_status:
+			raise Exception, 'There is no connection'
+		print "talk to robo"
+		reply = self.send_and_receive('A')
+		return reply
+
+	def get_rel_pos(self):
+		"""
+		Returns the last measurement of the relative positions
+		:return: relative position array
+		:rtype: tuple
+		"""
+		return self._rel_pos

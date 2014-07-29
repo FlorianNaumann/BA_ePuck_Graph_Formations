@@ -121,7 +121,7 @@ class graph():
 
 		if self.acyclic == None :
 			self.acyclic = True
-			# test for cycles with Tarjan's Algorithm (DFS)
+			# test for cycles with modified Tarjan's Algorithm (DFS)
 
 			vv = (None,) # visited vertices
 
