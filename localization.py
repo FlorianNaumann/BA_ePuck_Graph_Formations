@@ -47,10 +47,10 @@ def get_formation(robot, myPin, val_tup = None):
 
 def _get_id_lookup(val_tup):
 	# how many robots do we have?
-	no_agents =	len(val_tup)/5
+	no_agents =	len(val_tup)
 
 	# setup an ID to btPin
-	return dict(zip(sorted(np.array(val_tup)[0::5].astype(int)),range(no_agents)))
+	return dict(zip(sorted([ int(i[0]) for i in val_tup ]),range(no_agents)))
 
 
 def _get_neighbours(myPin, val_tup, dict_IDs):
@@ -62,15 +62,15 @@ def _get_neighbours(myPin, val_tup, dict_IDs):
 	type robot:  an active connected ePuck instance
 	"""
 	# how many robots do we have?
-	no_agents =	len(val_tup)/5
+	no_agents =	len(val_tup)
 
 	# --- transform tuple to array ---
 	sensed_array = np.zeros((no_agents,no_agents))
 
 	for i in xrange(no_agents): # do for each set of data
-		coords = (dict_IDs[myPin],dict_IDs[val_tup[i*5]])
-		sensed_array[coords      ] = val_tup[i*5+3] # assign distances
-		sensed_array[coords[::-1]] = val_tup[i*5+3] # assign distances
+		coords = (dict_IDs[myPin],dict_IDs[val_tup[i][0]])
+		sensed_array[coords      ] = val_tup[i][3] # assign distances
+		sensed_array[coords[::-1]] = val_tup[i][3] # assign distances
 
 	return sensed_array
 
@@ -78,15 +78,15 @@ def _get_neighbours(myPin, val_tup, dict_IDs):
 def _get_angles(myPin, val_tup):
 
 	# how many robots do we have?
-	no_agents =	len(val_tup)/5
+	no_agents =	len(val_tup)
 
 	# dict that maps IDs to angles
 	angle = {}
 
 	for i in xrange(no_agents): # do for each set of data
-		if val_tup[i*5] == myPin:
+		if val_tup[i][0] == myPin:
 			continue
-		angle[val_tup[i*5]] = DICT_SENSOR_ANGLES[val_tup[i*5+2]]
+		angle[val_tup[i][0]] = DICT_SENSOR_ANGLES[val_tup[i][1]]
 
 	return angle
 
@@ -98,13 +98,13 @@ def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 	no_agents = neighbour_array.shape[0]
 
 	# inverse mapping of IDdict. e.g. PINdict[myId] = mypin
-	PINdict = {v:k for k, v in IDdict.items()}
+	PINdict = dict((v,k) for k, v in IDdict.items())
 
 	for v1 in xrange(no_agents):
-		if v1 == IDdict[myPin]:
+		if v1 == IDdict[myPin] or angle_map[PINdict[v1]] == -1:
 			continue
 		for v2 in xrange(v1+1, no_agents):
-			if v2 == IDdict[myPin]:
+			if v2 == IDdict[myPin] or angle_map[PINdict[v2]] == -1:
 				continue
 			# print 'processing edge from ',PINdict[v1],' to ',PINdict[v2]
 			# translate detecting sensors into angles
@@ -133,8 +133,8 @@ if __name__ == "__main__":
 
 	ID = 3112
 
-	A = (3140, 1, 2, 4., 123123L, 3139, 5, 1, 5., 123124L, 3112, 9, 9, 0.,123123L,    3306, 2,7, 4.12, 123123L)
-	B = (3140, 9, 9, 0., 123114L, 3139, 1, 0, 3., 12412L,  3112, 5, 5, 4.,123123123L, 3306, 6,6, 6.4, 12314L)
+	A = [(3140, 1, 2, 4., 123123L), (3139, 5, 1, 5., 123124L),( 3112, 9, 9, 0.,123123L),(    3306, 2,7, 4.12, 123123L)]
+	B = [(3140, 9, 9, 0., 123114L),( 3139, 1, 0, 3., 12412L),(  3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4, 12314L)]
 
 	testi = B
 

@@ -13,4 +13,5 @@ DICT_SENSOR_ANGLES = { # sensor_no : angle from the front of the robot in rad
 							4	   :	2.64	,	# 4.21
 							5	   :	1.57	,	# 3.14159
 							6	   :	0.80	,	# 2.37
-							7	   :	0.30	}	# 1.87
+							7	   :	0.30	,	# 1.87
+							9	   :	 -1     }   # unrecognized angle

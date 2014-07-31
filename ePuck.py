@@ -133,7 +133,7 @@ class ePuck():
 		self._light_sensor = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 	#	self._microphone = (0, 0, 0)
 		self._pil_image = None
-		self._rel_pos = (0, 0, 0, 0., 0) * NUMBER_OF_ROBOTS
+		self._rel_pos = [(0, 0, 0, 0., 0)] * NUMBER_OF_ROBOTS
 
 		# Leds
 		self._leds_status = [False] * 10
@@ -361,7 +361,7 @@ class ePuck():
 				parameters = ('A', 9*NUMBER_OF_ROBOTS, '='+'HBBBI'*NUMBER_OF_ROBOTS)
 				reply = send_binary_mode(parameters)
 				if type(reply) is tuple and type(reply[0]) is int:
-					self._rel_pos = reply
+					self._rel_pos = [ reply[k*5:k*5+5] for k in xrange(NUMBER_OF_ROBOTS) ]
 
 			elif s == 'o':
 				# Light sensors
