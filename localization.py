@@ -9,6 +9,13 @@ if platform.machine() == 'armv7l':
 from constants import *
 
 
+# Names to indices for better readability
+BT_PIN		= 0
+MY_SENSOR	= 1
+HIS_SENSOR	= 2
+DISTANCE	= 3
+
+
 def get_localization(robot, myPin, val_tup = None):
 	"""
 	this is the interface function that is used in Control.py
@@ -37,21 +44,37 @@ def get_formation(robot, myPin, val_tup = None):
 	if robot != None:
 		val_tup = robot.get_rel_pos()
 
-	IDdict = _get_id_lookup(val_tup)
-	na = _get_neighbours(myPin, val_tup, IDdict)
-	ad = _get_angles(myPin, val_tup)
+	active_bots = _filter_active_units(val_tup, myPin)
+	IDdict = _get_id_lookup(active_bots)
+	na = _get_neighbours(myPin, active_bots, IDdict)
+	ad = _get_angles(myPin, active_bots)
 	fg = _fill_graph(myPin, na, IDdict, ad)
 
 	return fg
 
+########################################################
+
+def _filter_active_units(val_tup, myPin):
+	# TODO implement timestamps here also?
+
+	for robo in val_tup:
+		if robo[BT_PIN] == myPin:
+			continue
+		if robo[MY_SENSOR] == 9 and robo[HIS_SENSOR] == 9 and robo[DISTANCE] == 0 :
+			val_tup.remove(robo)
+
+	return val_tup
+
+########################################################
 
 def _get_id_lookup(val_tup):
 	# how many robots do we have?
 	no_agents =	len(val_tup)
 
 	# setup an ID to btPin
-	return dict(zip(sorted([ int(i[0]) for i in val_tup ]),range(no_agents)))
+	return dict(zip(sorted([ int(robo[BT_PIN]) for robo in val_tup ]),range(no_agents)))
 
+########################################################
 
 def _get_neighbours(myPin, val_tup, dict_IDs):
 	"""
@@ -68,12 +91,13 @@ def _get_neighbours(myPin, val_tup, dict_IDs):
 	sensed_array = np.zeros((no_agents,no_agents))
 
 	for i in xrange(no_agents): # do for each set of data
-		coords = (dict_IDs[myPin],dict_IDs[val_tup[i][0]])
-		sensed_array[coords      ] = val_tup[i][3] # assign distances
-		sensed_array[coords[::-1]] = val_tup[i][3] # assign distances
+		coords = (dict_IDs[myPin],dict_IDs[val_tup[i][BT_PIN]])
+		sensed_array[coords      ] = val_tup[i][DISTANCE] # assign distances
+		sensed_array[coords[::-1]] = val_tup[i][DISTANCE] # assign distances
 
 	return sensed_array
 
+########################################################
 
 def _get_angles(myPin, val_tup):
 
@@ -84,12 +108,13 @@ def _get_angles(myPin, val_tup):
 	angle = {}
 
 	for i in xrange(no_agents): # do for each set of data
-		if val_tup[i][0] == myPin:
+		if val_tup[i][BT_PIN] == myPin:
 			continue
-		angle[val_tup[i][0]] = DICT_SENSOR_ANGLES[val_tup[i][1]]
+		angle[val_tup[i][BT_PIN]] = DICT_SENSOR_ANGLES[val_tup[i][MY_SENSOR]]
 
 	return angle
 
+########################################################
 
 def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 	"""
@@ -119,6 +144,7 @@ def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 	
 	return neighbour_array
 
+########################################################
 
 def setup(robot):
 	"does the setup to use the relative position from Sophia Schillai"
@@ -127,18 +153,19 @@ def setup(robot):
 
 	return
 
-
+########################################################
 
 if __name__ == "__main__":
 
-	ID = 3112
+	ID = 3139
 
 	A = [(3140, 1, 2, 4., 123123L), (3139, 5, 1, 5., 123124L),( 3112, 9, 9, 0.,123123L),(    3306, 2,7, 4.12, 123123L)]
 	B = [(3140, 9, 9, 0., 123114L),( 3139, 1, 0, 3., 12412L),(  3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4, 12314L)]
+	C = [(3140, 9, 9, 0., 123114L),( 3139, 9, 9, 0., 12412L),(  3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4, 12314L)]
 
-	testi = B
+	testi = C
 
-	fg = get_formation(None,3140,testi)
+	fg = get_formation(None,ID,testi)
 
 #	IDdict = _get_id_lookup(testi)
 #	print IDdict
