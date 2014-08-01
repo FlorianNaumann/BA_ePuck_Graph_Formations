@@ -17,9 +17,10 @@ from graph import *
 
 class formation():
 	"""
+	class that wraps the graph and stores a mapping from the nodes to the robotIDs
 	"""
 	
-	def __init__(self, graph=None):
+	def __init__(self, graph=None, ID_Map={}):
 		
 		if graph is not None :
 			if self.set_graph(graph) is not True:
@@ -27,22 +28,31 @@ class formation():
 		else: 
 			self.my_graph = None
 				
-		# ID to table entry dictionary
-		# TODO role assignment with respect to the localization
-		self.ID_lookup = {MY_BT : 0, 1234 : 1}
+		# ID to table - dictionary
+		self.ID_lookup = ID_Map
 
 		return
 		
 
-	
-	
-	def run(self, graph):
-		if self.my_graph.is_complete():
-			if not self.my_graph.is_directed():
-				# we have an complete undirected graph
-				# henneberg sequence
-				pass
+
+#	def run(self, graph):
+#		if self.my_graph.is_complete():
+#			if not self.my_graph.is_directed():
+#				# we have an complete undirected graph
+#				# henneberg sequence
+#				pass
+#		return
+
+
+	def get_possible_leaders():
+
 		return
+
+#####################################################
+#													#
+#		G E T   &   S E T   F U N C T I O N S		#
+#													#
+#####################################################
 
 	def set_graph(self, new_graph):
 		g = self._make_usable_graph(new_graph)
@@ -51,6 +61,28 @@ class formation():
 			return True
 		return False
 
+
+	def get_graph(self):
+		return self.my_graph.get_base_graph()
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def set_IDmap(self, new_IDmap):
+		if isinstance(new_IDmap, dict):
+			self.ID_lookup = new_IDmap
+			return True
+		return False
+
+
+	def get_IDmap(self):
+		return self.ID_lookup
+
+
+#####################################################
+#													#
+#		I N T E R N A L     F U N C T I O N S		#
+#													#
+#####################################################
 
 	def _make_usable_graph(self, g):
 		if type(g).__module__ == 'numpy' and type(g).__name__ == 'ndarray':
@@ -66,9 +98,11 @@ class formation():
 
 		return None
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+##-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-##
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
-
-#lets test this shit
+# simple test run
 if __name__ == "__main__":
 
 	# Adjacency matrices

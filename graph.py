@@ -70,7 +70,7 @@ class graph():
 					if ( self.vertices < 4 ) :
 						self.graph_is_persistent = True
 					else:
-						# TODO test for cycle-free
+						# test for cycle-free
 						if self.is_cycle_free():
 							# ~~~~~ test for constraint consistence ~~~~~ #
 							# --- simple test for cycle-free or leader-follower structured graphs ---

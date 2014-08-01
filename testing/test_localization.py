@@ -18,6 +18,8 @@ import localization as loc
 AGENTS = 4
 roboID = (3112, 3139, 3140, 3306)
 
+SCENARIOS = 5	
+
 DIC_ANGLE_SENSORS = [ # angle(rad) : corresponding sensor
 							(0.385,	2),
 							(1.02, 1),
@@ -98,7 +100,8 @@ def get_val_tab(angles,graph,targetID):
 #############################################
 
 def create_graph_plot(c,g,o,number,name, timestr):
-	A = pgv.AGraph(orientation='portrait', overlap='scale')
+
+	A = pgv.AGraph(overlap='scale')
 
 	# do nodes
 	for v in xrange(AGENTS):
@@ -106,6 +109,8 @@ def create_graph_plot(c,g,o,number,name, timestr):
 			A.add_node( v,
 					#pos=(str(c[v][0])+','+str(c[v][1])+'!'),
 					shape='house',
+					#image='ePuck.png',
+					#imagescale='both',
 					orientation=(180*math.pi/o[v]),
 					label=str(roboID[v]),
 					color="red"
@@ -114,6 +119,8 @@ def create_graph_plot(c,g,o,number,name, timestr):
 			A.add_node( v,
 					#pos=(str(c[v][0])+','+str(c[v][1])+'!'),
 					shape='house',
+					#image='ePuck.png',
+					#imagescale='both',
 					orientation=(180*math.pi/o[v]),
 					label=str(roboID[v])
 					)
@@ -121,7 +128,7 @@ def create_graph_plot(c,g,o,number,name, timestr):
 	# do edges
 	for v1 in xrange(0,AGENTS):
 		for v2 in xrange(v1+1, AGENTS):
-			A.add_edge(v1,v2,label=g[(v1,v2)], len=g[(v1,v2)])
+			A.add_edge(v1,v2,label=g[(v1,v2)], len=g[(v1,v2)]/3)
 
 	A.layout()
 
@@ -148,7 +155,7 @@ if __name__ == "__main__":
 			os.makedirs(timestr)
 
 	# insert loop here to test more configurations	
-	for k in xrange(5):
+	for k in xrange( SCENARIOS ):
 		c = get_coords()
 		# get graph = groundtruth
 		g = create_graph(c)
@@ -162,7 +169,7 @@ if __name__ == "__main__":
 		a = get_angles(g,c,o)
 
 		# use pseudo-output for localization
-		test_graphs = [loc.get_formation( None ,roboID[agent] ,get_val_tab(a,g,agent) ) for agent in xrange(AGENTS) ]
+		test_graphs = [loc.get_formation( None ,roboID[agent] ,get_val_tab(a,g,agent) )[0] for agent in xrange(AGENTS) ]
 
 		# for every graph we got from the localization mechanism
 	

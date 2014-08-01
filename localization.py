@@ -16,6 +16,14 @@ HIS_SENSOR	= 2
 DISTANCE	= 3
 
 
+
+
+######################################################
+#-													-#
+#-		I N T E R F A C E   F U N C T I O N S		-#
+#-													-#
+######################################################
+
 def get_localization(robot, myPin, val_tup = None):
 	"""
 	this is the interface function that is used in Control.py
@@ -26,6 +34,7 @@ def get_localization(robot, myPin, val_tup = None):
 	"""
 	return
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 def get_formation(robot, myPin, val_tup = None):
 	"""
@@ -40,6 +49,9 @@ def get_formation(robot, myPin, val_tup = None):
 
 	param val_tup: testing interface
 	type val_tup:  tuple
+
+	return	Graph(np.array) and ID Mappping(dict) as a tuple
+	rtype:	tuple
 	"""
 	if robot != None:
 		val_tup = robot.get_rel_pos()
@@ -50,9 +62,24 @@ def get_formation(robot, myPin, val_tup = None):
 	ad = _get_angles(myPin, active_bots)
 	fg = _fill_graph(myPin, na, IDdict, ad)
 
-	return fg
+	return fg, IDdict
 
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+def setup(robot):
+	"""
+	does the setup to use the relative position from Sophia Schillai
+	"""
+
+	robot.enable('relative_position')
+
+	return
+
+#####################################################
+#													#
+#		I N T E R N A L     F U N C T I O N S		#
+#													#
+#####################################################
 
 def _filter_active_units(val_tup, myPin):
 	# TODO implement timestamps here also?
@@ -65,7 +92,7 @@ def _filter_active_units(val_tup, myPin):
 
 	return val_tup
 
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 def _get_id_lookup(val_tup):
 	# how many robots do we have?
@@ -74,15 +101,10 @@ def _get_id_lookup(val_tup):
 	# setup an ID to btPin
 	return dict(zip(sorted([ int(robo[BT_PIN]) for robo in val_tup ]),range(no_agents)))
 
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 def _get_neighbours(myPin, val_tup, dict_IDs):
 	"""
-	this is the interface function that is used in Control.py
-	it should provide the sensed graph that represents the current real formation
-
-	param robot: an active connected ePuck instance
-	type robot:  an active connected ePuck instance
 	"""
 	# how many robots do we have?
 	no_agents =	len(val_tup)
@@ -97,7 +119,7 @@ def _get_neighbours(myPin, val_tup, dict_IDs):
 
 	return sensed_array
 
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 def _get_angles(myPin, val_tup):
 
@@ -114,7 +136,7 @@ def _get_angles(myPin, val_tup):
 
 	return angle
 
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 	"""
@@ -144,28 +166,21 @@ def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 	
 	return neighbour_array
 
-########################################################
 
-def setup(robot):
-	"does the setup to use the relative position from Sophia Schillai"
 
-	robot.enable('relative_position')
-
-	return
-
-########################################################
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 if __name__ == "__main__":
 
 	ID = 3139
 
-	A = [(3140, 1, 2, 4., 123123L), (3139, 5, 1, 5., 123124L),( 3112, 9, 9, 0.,123123L),(    3306, 2,7, 4.12, 123123L)]
-	B = [(3140, 9, 9, 0., 123114L),( 3139, 1, 0, 3., 12412L),(  3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4, 12314L)]
-	C = [(3140, 9, 9, 0., 123114L),( 3139, 9, 9, 0., 12412L),(  3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4, 12314L)]
+	A = [(3140, 1, 2, 4., 123123L),( 3139, 5, 1, 5., 12124L),( 3112, 9, 9, 0.,123121233L),( 3306, 2,7, 4.12, 12123L)]
+	B = [(3140, 9, 9, 0., 123114L),( 3139, 1, 0, 3., 12412L),( 3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4,  12314L)]
+	C = [(3140, 9, 9, 0., 123114L),( 3139, 9, 9, 0., 12412L),( 3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4,  12314L)]
 
 	testi = C
 
-	fg = get_formation(None,ID,testi)
+	a = get_formation(None,ID,testi)
 
 #	IDdict = _get_id_lookup(testi)
 #	print IDdict
@@ -174,6 +189,6 @@ if __name__ == "__main__":
 #	ad = _get_angles(ID, testi)
 #	print ad
 ##	fg = _fill_graph(ID, na, IDdict, ad)
-	print fg
+	print a
 	
 
