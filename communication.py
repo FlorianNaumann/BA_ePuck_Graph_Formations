@@ -14,19 +14,22 @@ import platform
 # project related imports
 if platform.machine() == 'armv7l':
 	from ePuck import *
+else:
+	from fakebot import *
 from constants import *
 
 
 
-def get_mission():
+def get_new_msg():
 	return None
 
 def get_desired_leader():
 	"""
 	decides the leader of the formation
-	idea: can be divided into "server setting" and "election by the swarm", perhaps switching between modes or depending on connection to server -> increased stability
+	idea:	can be divided into "server setting" and "election by the swarm",
+			perhaps switching between these modes or depending on connection to server -> increasing stability
 	"""	
-	return (,)
+	return []
 
 def setup(robot):
 	return True

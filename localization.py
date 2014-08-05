@@ -5,7 +5,10 @@ import platform
 
 # project related imports
 if platform.machine() == 'armv7l':
-	from ePuck import ePuck
+	from ePuck import *
+else:
+	from fakebot import *
+
 from constants import *
 
 
@@ -27,12 +30,30 @@ DISTANCE	= 3
 def get_localization(robot, myPin, val_tup = None):
 	"""
 	this is the interface function that is used in Control.py
-	it should provide the sensed graph that represents the current real formation
+	it creates a grid that is aligned with the robot's view
+	and returns the robots coordinates together with its IDs
 
 	param robot: an active connected ePuck instance
 	type robot:  an active connected ePuck instance
+
+	return:	a dictionary that maps IDs to (x,y) coordinate pairs relative to this agent
+	rtype:	dictionary
 	"""
-	return
+	# the dictionary to be returned
+	IDcoords = {myPin : (0,0)}
+
+	# get relative measurements
+	if robot != None:
+		val_tup = robot.get_rel_pos()
+
+	active_bots = _filter_active_units(val_tup, myPin)
+	IDdict = _get_id_lookup(active_bots)
+	na = _get_neighbours(myPin, active_bots, IDdict)
+	ad = _get_angles(myPin, active_bots)
+
+	IDcoords = _calc_coords(myPin, na, IDdict, ad)
+
+	return IDcoords
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
@@ -113,7 +134,7 @@ def _get_neighbours(myPin, val_tup, dict_IDs):
 	sensed_array = np.zeros((no_agents,no_agents))
 
 	for i in xrange(no_agents): # do for each set of data
-		coords = (dict_IDs[myPin],dict_IDs[val_tup[i][BT_PIN]])
+		coords = (dict_IDs[myPin], dict_IDs[val_tup[i][BT_PIN]])
 		sensed_array[coords      ] = val_tup[i][DISTANCE] # assign distances
 		sensed_array[coords[::-1]] = val_tup[i][DISTANCE] # assign distances
 
@@ -131,10 +152,21 @@ def _get_angles(myPin, val_tup):
 
 	for i in xrange(no_agents): # do for each set of data
 		if val_tup[i][BT_PIN] == myPin:
-			continue
+			angle[myPin] = 0
 		angle[val_tup[i][BT_PIN]] = DICT_SENSOR_ANGLES[val_tup[i][MY_SENSOR]]
 
 	return angle
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+def _calc_coords(myPin, na, IDdict, ad):
+	IDcoords = {}
+
+	for v in IDdict.keys()	:
+		y = math.sin(ad[v]) * na[IDdict[myPin]][IDdict[v]]
+		x = math.cos(ad[v]) * na[IDdict[myPin]][IDdict[v]]
+		IDcoords[v] = (round(x,2),round(y,2))
+	return IDcoords
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
@@ -172,23 +204,31 @@ def _fill_graph( myPin, neighbour_array, IDdict, angle_map ):
 
 if __name__ == "__main__":
 
-	ID = 3139
+	ID = 3112
 
-	A = [(3140, 1, 2, 4., 123123L),( 3139, 5, 1, 5., 12124L),( 3112, 9, 9, 0.,123121233L),( 3306, 2,7, 4.12, 12123L)]
+	A = [(3140, 2, 1, 4., 123123L),( 3139, 1, 5, 5., 12124L),( 3112, 9, 9, 0.,123121233L),( 3306, 7,2, 4.12, 12123L)]
 	B = [(3140, 9, 9, 0., 123114L),( 3139, 1, 0, 3., 12412L),( 3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4,  12314L)]
 	C = [(3140, 9, 9, 0., 123114L),( 3139, 9, 9, 0., 12412L),( 3112, 5, 5, 4.,123123123L),( 3306, 6,6, 6.4,  12314L)]
 
-	testi = C
+	testi = A
 
-	a = get_formation(None,ID,testi)
+	fakebot = ePuck(PIN=ID, val_tup=testi)
+	fakebot.connect()
 
-#	IDdict = _get_id_lookup(testi)
-#	print IDdict
-#	na = _get_neighbours(ID, testi, IDdict)
-#	print na
-#	ad = _get_angles(ID, testi)
-#	print ad
-##	fg = _fill_graph(ID, na, IDdict, ad)
+	a = get_formation(fakebot,ID)
 	print a
+
+#	active_bots = _filter_active_units(testi, ID)
+#	print active_bots
+#	IDdict = _get_id_lookup(active_bots)
+#	print IDdict
+#	na = _get_neighbours(ID, active_bots, IDdict)
+#	print na
+#	ad = _get_angles(ID, active_bots)
+#	print ad
+#	cc = _calc_coords(ID, na, IDdict, ad)
+#	print cc
+#	fg = _fill_graph(ID, na, IDdict, ad)
+#	print fg
 	
 

@@ -44,9 +44,8 @@ class formation():
 #		return
 
 
-	def get_possible_leaders():
-
-		return
+	def get_possible_leaders(self):
+		return [ ID for ID in self.ID_lookup.keys() if self.ID_lookup[ID] in self.my_graph.get_potential_leaders() ] # easy einzeiler ;)
 
 #####################################################
 #													#
@@ -77,6 +76,26 @@ class formation():
 	def get_IDmap(self):
 		return self.ID_lookup
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def get_distance(self, fromID, toID):
+		return self.my_graph[(self.ID_lookup[fromID], self.ID_lookup[toID])]
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def get_agent_leaders(self, myID):
+		# TODO get my leaders
+		return (3140,3139)
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def set_leader(self, leaderID):
+		# TODO get my leaders
+		return
+
+	def get_leader(self):
+		# TODO get my leaders
+		return self.leaderID
 
 #####################################################
 #													#

@@ -24,6 +24,11 @@ class graph():
 		
 		self.set_graph(zeros((vertices, vertices)))
 
+
+	def __getitem__(self, index):
+		return self.my_graph[index]
+
+
 	#----------------------------------#
 	#  Testing for certain properties  #
 	#----------------------------------#	
@@ -76,8 +81,9 @@ class graph():
 							# --- simple test for cycle-free or leader-follower structured graphs ---
 							# step 1) find the one leader (out-degree of 0)
 							# step 2) indentify the coleader (out-degree of 1 AND connection to the leader)
-							# step 3) every other vertex has to have more than 2 outgoing edge
-							if self._check_for_leader_follower() :
+							# step 3) every other vertex has to have at least 2 outgoing edges
+							if self.check_for_leader_follower() :
+								#TODO check for functionality
 								if (self.my_graph[(self.firstfollower_id, self.leader_id)] != 0) :
 									self.graph_is_persistent = True
 		return self.graph_is_persistent
@@ -167,20 +173,24 @@ class graph():
 
 		#get number of vertices
 		self.vertices = min(array.shape)
-
-		# count directed and undirected edges
-		self._get_number_of_edges()
 		
 		# reset some stored graphs
 		self.min_graph  = None
 		self.base_graph = None
 		
+		# reset node classifications
+		self.leader_id				= ()
+		self.firstfollower_id		= ()
+		self.follower_id			= ()
+
 		# reset saved properties		
-		self.leader_id        = None
-		self.firstfollower_id = None
-		self.acyclic          = None
+		self.acyclic				= None
 		self.graph_is_rigid         = None
 		self.graph_is_persistent    = None
+		
+		# do initial counting
+		self._get_number_of_edges()
+		self._classify_nodes()
 
 		return True
 		
@@ -248,31 +258,31 @@ class graph():
 		print self.my_graph
 	
 
-	def _check_for_leader_follower(self):
+	def check_for_leader_follower(self):
 		"""
 		finds leader and first follower
 		returns false if graph doesnt have leader-follower-structure otherwise true
 		"""
-		for vertex in xrange(0, self.vertices):
-			# count out degree
-			d_out = np.count_nonzero(self.my_graph[vertex])
-			if ( d_out == 0 ): # leader
-				if ( self.leader_id is None ):
-					self.leader_id = vertex 
-				elif ( self.leader_id != vertex ): # found unknown leader
-					# 2 leaders -> independent robots -> no structure -> not even rigid
-					return False
-			elif ( d_out == 1 ): # first follower
-				if ( self.firstfollower_id is None ):
-					self.firstfollower_id = vertex
-				elif ( self.firstfollower_id != vertex ):
-					# found more than one firstfollower, therefore no leader-ff-structure	
-					return False
-		
-		if self.firstfollower_id is not None and self.leader_id is not None :
+
+		if len(self.firstfollower_id) == 1 and len(self.leader_id) == 1 :
 			return True
 		else:
 			return False
+
+
+
+	def _classify_nodes(self):
+		for vertex in xrange(0, self.vertices):
+			# count out degree
+			d_out = np.count_nonzero(self.my_graph[vertex])
+			#classify
+			if   ( d_out == 0 ): # "leader"-type node
+				self.leader_id = self.leader_id + (vertex,)
+			elif ( d_out == 1 ): # "first follower"-type node
+				self.firstfollower_id = self.firstfollower_id + (vertex,)
+			else: # ordinary Follower type
+				self.follower_id= self.follower_id + (vertex,)
+		return
 
 	#-----------------------#
 	#  interface functions  #
@@ -282,19 +292,66 @@ class graph():
 		return self.vertices
 	
 	def set_leader(self, ID):
-		# TODO mabye change this to variable to user_leader or sth...
-		self.leader_id = ID
+		# TODO mabye change this variable to user_leader or sth...
+		# self.leader_id = (ID,)
 		return
 		
 	def get_leader_id(self):
 		"""
 		if no leader is set manually, die robot with the lowest id is leader
 		"""
-		if self.leader_id == None :
-			# TODO get lowest id to leader
-			pass
+		if len(self.leader_id) != 1 :
+			return None
 		return self.leader_id
-		
+
+	def get_potential_leaders(self):
+		"""
+		return	list of nodes that can lead the formation
+		rtype	tupel
+		"""
+		# TODO the return type is currently not always a tuple; sometimes its a list... someone should fix this
+
+		l_list = ()
+
+		if self.is_rigid() or True: #TODO remove always true
+			if len(self.leader_id) == 0:
+				if   len(self.firstfollower_id) == 0:
+					l_list = self.follower_id
+				elif len(self.firstfollower_id) == 1:
+					l_list = self.firstfollower_id + ( next( i for i, e in enumerate( self.my_graph[self.firstfollower_id[0]] ) if e!= 0 ), )
+				elif len(self.firstfollower_id) >= 2:
+					# best leaders are the firstfollowers that are followed by others
+					ff_leaders = ()
+					for ff in self.firstfollower_id:
+						ff_leaders = ff_leaders + (next( i for i, e in enumerate( self.my_graph[ff] ) if e!= 0 ),)
+					l_list = [ i for i in ff_leaders if i in self.firstfollower_id ]
+					if len(l_list)==0:
+						l_list = self.firstfollower_id
+			elif len(self.leader_id) == 1:
+				if   len(self.firstfollower_id) == 0:
+					l_list = self.leader_id
+				elif len(self.firstfollower_id) == 1:
+					# does the one firstfollower follower the one leader?
+					if ( self.my_graph[(self.firstfollower_id[0],self.leader_id[0])] != 0 ):
+					#	yes:	the leader is the best potential leader
+						l_list = self.leader_id
+					else:						
+					#	no:		-> problem: not all robots can be controlled as one formation;
+					#						potential leaders can be: the leader, the FirstF, the robot being followed by the FirstF
+						l_list = self.leader_id + self.firstfollower_id + (next( i for i, e in enumerate( self.my_graph[self.firstfollower_id[0]] ) if e!= 0 ),)
+				elif len(self.firstfollower_id) >= 2:
+					# target of the firstfollowers can be leaders, best case: one of the leaders or FF's is being followed by a FF
+					for ff in self.firstfollower_id:
+						ff_leaders = ff_leaders + (next( i for i, e in enumerate( self.my_graph[ff] ) if e!= 0 ),)
+					l_list = [ i for i in ff_leaders if i in self.firstfollower_id or i in self.leader_id]
+					if len(l_list)==0:
+						l_list = self.firstfollower_id + self.leader_id
+			else:
+				l_list = self.leader_id
+				# else there are more than 2 leaders and the formation is not rigid as a whole
+				# TODO cases if there are more that 2 leaders
+
+		return l_list
 		
 #lets test this shit
 if __name__ == "__main__":
@@ -311,11 +368,18 @@ if __name__ == "__main__":
 	#  D    0 2 4 X 2					#  D    0 1 1 X 1 					#  D    0 1 1 X 0
 	#  E    0 1 1 2 X					#  E    1 0 1 1 X 					#  E    0 1 1 0 X
 
-	a = np.array([[0,7,0,0,0],[7,0,5,2,1],[0,5,0,4,1],[0,2,4,0,2],[0,1,1,2,0]])
-	b = np.array([[0,1,0,0,1],[1,0,1,1,0],[0,1,0,1,1],[0,1,1,0,1],[1,0,1,1,0]])
-	c = np.array([[0,0,0,0,0],[1,0,0,0,0],[1,1,0,0,0],[0,1,1,0,0],[0,1,1,0,0]])
+	a  = np.array([[0,7,0,0,0],[7,0,5,2,1],[0,5,0,4,1],[0,2,4,0,2],[0,1,1,2,0]])
+	b  = np.array([[0,1,0,0,1],[1,0,1,1,0],[0,1,0,1,1],[0,1,1,0,1],[1,0,1,1,0]])
+	c  = np.array([[0,0,0,0,0],[1,0,0,0,0],[1,1,0,0,0],[0,1,1,0,0],[0,1,1,0,0]])
+	d  = np.array([[0]])
 	
-	g = c
+	l1 = np.array([[0,0,1,0,0],[0,0,1,0,1],[0,1,0,1,0],[1,0,1,0,0],[0,0,1,1,0]])
+	l2 = np.array([[0,1,0,0,1],[1,0,1,0,1],[0,0,0,1,0],[0,1,1,0,0],[0,0,1,1,0]])
+	l3 = np.array([[0,0,0,0,0],[0,0,0,1,1],[0,1,0,1,0],[1,0,0,0,0],[1,0,0,1,0]])
+	l4 = np.array([[0,1,0,0,0],[0,0,1,0,0],[0,1,0,1,0],[1,0,0,0,0],[1,0,0,1,0]])
+
+
+	g = l1
 
 	test = graph(5)
 	test.set_graph(g)
@@ -326,4 +390,9 @@ if __name__ == "__main__":
 	print 'is_cycle_free() = ', test.is_cycle_free()
 	print 'is_persistent() = ', test.is_persistent()
 	print 'get_leader_id() = ', test.get_leader_id()
+	print 'f_ids	= ', test.follower_id
+	print 'ff_ids	= ', test.firstfollower_id
+
+	print 'get_potential_leaders() = ', test.get_potential_leaders()
+
 	print g
