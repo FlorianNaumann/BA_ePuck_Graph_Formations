@@ -62,12 +62,13 @@ class control():
 		self.formation = form.formation( est_graph, ID_Map )
 
 		# who is the leader? am i the leader?
-		# TODO do i have to do this only once? or in every loop later?
+		# do this here once. if any changes for the leader occur, they are introduced from the com and handled at update_goals
 		leaderID = self.determine_leader()
 
 		# give leaderID back to the formation
 		self.formation.set_leader(leaderID)
-		# and calculate a minimal control graph
+		# and calculate a minimal control graph (DEBUG OUTPUT, making sure to NOT do this calculation inside the loop)
+		print self.formation.setup_control_graph()
 
 		# ---------------- Part 2 ---------------- 
 		# control loop
@@ -80,17 +81,20 @@ class control():
 			local = loc.get_localization(self.robot, self.myPin)
 
 			# interpret sensor data
-			#     update mission (new goals)
+			#     update mission (new goals) from the gotten message
 			self.update_goals(msg)
 			#     get optimal position
 			(dx,dy) = self.get_opt_pos(local)
 
-			# calculate course update
+			# [optional] calculate course update
 			#     derive private (long term) goal from mission (general course)
 			#     get (mid term) goal from local sensing (obstacle avoidance)
 			#     choose formation correction from relative position
 			
 			# output motor speeds
+			(lmotor, rmotor) = self.get_motor_speeds((dx,dy))
+
+			print (lmotor, rmotor)
 
 			self.robot.step()
 			break
@@ -105,7 +109,19 @@ class control():
 
 	
 	def update_goals(self, msg):
-		return True
+		# just a dummy function, because the communication is not implemented
+		# e.g.: for a formation change introduced by the base station, do the following here:
+		#	1) save the new formation as target formation
+		#		self.formation = form.formation( new_graph, new_ID_Map )
+		# 	2) start the leader election:
+		#		leaderID = self.determine_leader()
+		# 	3) give leaderID back to the formation
+		#		self.formation.set_leader(leaderID)
+		if (msg is None):
+			return True
+		else:
+			# DO the fancy stuff here
+			return True
 
 	
 	def determine_leader(self):
@@ -135,7 +151,7 @@ class control():
 		weight_c = 1
 
 		# get closest leader
-		l = () # loc.get_closest_leader() #TODO is this from loc?
+		l = () # loc.get_closest_leader() #TODO [optional] make this work
 		weight_l = 0.7
 
 		# calculate ratings for each robot
@@ -148,15 +164,85 @@ class control():
 						ranking[ID] = weight
 
 		# return the robot with the highest rating and the lowest btPin=ID
-		return min( [key for key in ranking.keys() if ranking[key]==ranking[max(ranking)]] )
+		top_candidates = [key for key in ranking.keys() if ranking[key]==ranking[max(ranking)]]
+		if len(top_candidates) == 0:
+			return ()
+		else:
+			return min( top_candidates )
 
 
 		
-	def	get_motor_speeds(self):
+	def	get_motor_speeds(self, target):
 		"""
 		returns the needed motor speeds of the robot in order to maintain formation
 		rtype: tuple
 		"""
+		target_pos = np.array(target)
+
+		# get my robot type (leader, firstfollower, follower)		
+		lc = len(self.formation.get_agent_leaders(self.myPin))
+		if lc == 0:
+			me = 'l' # leader 
+		elif lc == 1:
+			me = 'c' # first follower
+		else:
+			me = 'f' # ordinary follower
+
+		# FIX to let the formation drive straight ahead
+		final_pos = target_pos
+
+		# step 1) get speed-vectors from the formula		
+		# ordinary follower:
+		dist = np.linalg.norm(target_pos)
+		if dist < MIN_ERROR:
+			beta = 0
+		elif MIN_ERROR <= dist < 2*MIN_ERROR:
+			beta = (dist-MIN_ERROR)/MIN_ERROR
+		else:
+			beta = 1
+
+		dist_final = np.linalg.norm(final_pos)
+		# another drive straight-hack:
+		beta_final = 1
+		#if dist_final < MIN_ERROR_FINAL:
+		#	beta_final = 0
+		#elif MIN_ERROR_FINAL <= dist < 2*MIN_ERROR_FINAL:
+		#	beta_final = (dist-MIN_ERROR_FINAL)/MIN_ERROR_FINAL
+		#else:
+		#	beta_final = 1
+
+		if ( me == 'f' ):
+			if beta != 0: # prevent division by zero
+				v = MAX_SPD * beta * target_pos / dist
+			else:
+				v = np.array([0,0])
+		elif ( me == 'c' ):
+			if beta != 0: # prevent division by zero
+				# maintain formation position speed
+				v1 = MAX_SPD * target_pos / dist
+				# turn speed to get close to the final position
+				circle_vector = np.array([-target_pos[1], target_pos[0]])
+				v2 = MAX_SPD * beta_final * np.dot(circle_vector, final_pos) * (circle_vector / dist) # end_pos
+				v = beta * v1 + math.sqrt(1-beta**2) * v2
+			else:
+				v = np.array([0,0])
+		elif (me == 'l'):
+			if beta_final != 0:
+				v = MAX_SPD * beta_final * (final_pos / np.linalg.norm(final_pos)) # note: in the case of the leader the final_pos is identical to the target_pos
+			else:
+				v = np.array([0,0])
+
+		# step 2) calculate motor updates (evtl auslagern?)
+		
+		# hopefully smoother curve implementation for 2 motors
+		if ( v[0] != 0 ): # curve
+			r = (v[0]**2 + v[1]**2) / v[0]
+			spd_left  = np.linalg.norm(v) * np.sign(v[1]) * ( r+(WHEEL_DISTANCE/2) )/r
+			spd_right = np.linalg.norm(v) * np.sign(v[1]) * ( r-(WHEEL_DISTANCE/2) )/r
+		else: # driving straight
+			spd_left  = v[1]
+			spd_right = v[1]
+
 		return (spd_left, spd_right)
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
@@ -164,20 +250,39 @@ class control():
 	def get_opt_pos(self, local):
 
 		# get leader IDs from formation
-		leader = self.formation.get_agent_leaders(self.myPin)
+		leaders = self.formation.get_agent_leaders(self.myPin)
+		if len(leaders) == 0 : # leader of the formation
+			# fake; drive forward
+			dx = 0
+			dy = 1
+		else:
+			ref1 = 0 # first reference robot
+			ref2 = 1 # second reference robot
+			worst_case = False
+			while True: # calculate intersection of optimal distances
+				if worst_case: # there are no intersections
+					# drive towards the point halfway in between the first two leader-robots
+					a =  (local[leaders[ref1]][1]+local[leaders[ref2]][1])*0.5
+					b = -(local[leaders[ref1]][0]+local[leaders[ref2]][0])*0.5
+					c = 0
+				elif len(leaders) == 1 : # first follower
+					# TODO verify this solution
+					# follow the mainleader 
+					a =  local[leaders[ref1]][1]
+					b = -local[leaders[ref1]][0]
+					c = 0
+				elif len(leaders) >= 2 : # ordinary follower
+					# calc optimal position x and y from formula and localization of both leaders
+					# ------ the equation of the line of the intersections ax+by=c ------
+					a = 2*(local[leaders[ref2]][0] - local[leaders[ref1]][0])
+					b = 2*(local[leaders[ref2]][1] - local[leaders[ref1]][1])
 		
-		if len(leader) == 2 : # ordinary follower
-			# calc optimal position x and y from formula and localization of both leaders
-				# ------ the equation of the line of the intersections ax+by=c ------
-				a = 2*(local[leader[1]][0] - local[leader[0]][0])
-				b = 2*(local[leader[1]][1] - local[leader[0]][1])
-				
-				c = - ( local[leader[0]][0]**2 + local[leader[0]][1]**2 ) + self.formation.get_distance(self.myPin, leader[0])**2 + (local[leader[1]][0]**2 + local[leader[1]][1]**2) - self.formation.get_distance(self.myPin, leader[1])**2
+					c = - ( local[leaders[ref1]][0]**2 + local[leaders[ref1]][1]**2 ) + self.formation.get_distance(self.myPin, leaders[ref1])**2 + (local[leaders[ref2]][0]**2 + local[leaders[ref2]][1]**2) - self.formation.get_distance(self.myPin, leaders[ref2])**2
 
 				# ------ polynomial function with  y^2*d + y*e + f = 0 ------
 				d = b**2 / a**2 + 1
-				e = (-2*c*b/a**2) + (2*b/a*local[leader[0]][0]) + (-2*local[leader[0]][1])
-				f = c**2/a**2 - 2*c/a*local[leader[0]][0] + local[leader[0]][0]**2 +local[leader[0]][1]**2 - self.formation.get_distance(self.myPin, leader[0])**2
+				e = (-2*c*b/a**2) + (2*b/a*local[leaders[ref1]][0]) + (-2*local[leaders[ref1]][1])
+				f = c**2/a**2 - 2*c/a*local[leaders[ref1]][0] + local[leaders[ref1]][0]**2 +local[leaders[ref1]][1]**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
 
 				# ------ calculate both intersections from the quadratic equation ------
 				D = e**2-4*d*f
@@ -186,17 +291,24 @@ class control():
 					x1 = (b*y1 - c) / a
 					y2 = ( -e - math.sqrt(D) ) / (2*d)
 					x2 = (b*y2 - c) / a
+					break # escape loop
 				else:
-					#TODO what if there is no intersection?? HELP ME!!
-					return (0,0)
+					# if there is no intersection try again with another pair of leaders if possible (not the case for minimally persistent graphs)
+					if ( len(leaders) > ref1+2 ): #if there are alternative leader-circles try them
+						ref1 = ref1+1 
+						ref2 = ref2+1
+					elif ( len(leaders) == ref1+2 ):
+						ref1 = 0
+					else: # there are no alternative leaders and we have no intersection;
+						worst_case = True
 
-				# check which pair of coordinates is closer to me
-				if (y1**2+x1**2) > (y2**2+x2**2):
-					dx = x2
-					dy = y2
-				else:
-					dx = x1
-					dy = y1
+			# check which pair of coordinates is closer to me
+			if (y1**2+x1**2) > (y2**2+x2**2):
+				dx = x2
+				dy = y2
+			else:
+				dx = x1
+				dy = y1
 
 		return (round(dx,2), round(dy,2))
 

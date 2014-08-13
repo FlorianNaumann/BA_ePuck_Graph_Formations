@@ -2,7 +2,9 @@
 
 #MY_BT     = 1321  # not needed anymore
 MAX_SPD   =  500
-MIN_ERROR =    1
+MIN_ERROR =    5
+
+WHEEL_DISTANCE = 5.3 # cm
 
 # data taken from http://www.cyberbotics.com/dvd/common/doc/webots/guide/section8.1.html table8.4
 DICT_SENSOR_ANGLES = { # sensor_no : angle from the front of the robot in rad

@@ -31,6 +31,8 @@ class formation():
 		# ID to table - dictionary
 		self.ID_lookup = ID_Map
 
+		self.leaderID = None
+
 		return
 		
 
@@ -42,6 +44,12 @@ class formation():
 #				# henneberg sequence
 #				pass
 #		return
+
+	
+	def setup_control_graph(self):
+		# prerequisite: set leader
+		return self.my_graph.get_minimally_persistent_graph()
+
 
 
 	def get_possible_leaders(self):
@@ -84,17 +92,21 @@ class formation():
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 	def get_agent_leaders(self, myID):
-		# TODO get my leaders
-		return (3140,3139)
+		# get my leaders from the graph
+		l = self.my_graph.get_agent_leader(self.ID_lookup[myID])
+		return [ ID for ID in self.ID_lookup.keys() if self.ID_lookup[ID] in l ]
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
 	def set_leader(self, leaderID):
-		# TODO get my leaders
-		return
+		if leaderID in self.ID_lookup:
+			self.leaderID = leaderID
+			self.my_graph.set_leader(self.ID_lookup[leaderID])
+			return True
+		else:
+			return False
 
 	def get_leader(self):
-		# TODO get my leaders
 		return self.leaderID
 
 #####################################################

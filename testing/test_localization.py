@@ -149,7 +149,7 @@ if __name__ == "__main__":
 	DO_PNGS = True
 
 	if DO_PNGS:
-		timestr=time.strftime("%Y%m%d-%H%M%S")
+		timestr='localization_'+time.strftime("%Y%m%d-%H%M%S")
 		# create folder
 		if not os.path.exists(timestr):
 			os.makedirs(timestr)
