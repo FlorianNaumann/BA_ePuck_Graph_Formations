@@ -48,11 +48,23 @@ class control():
 		
 		return
 		
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
-	def run(self):
+	def main(self):
+		
+		self.setup()
+		while(True):
+			try:
+				self.run()
+			except KeyboardInterrupt:
+				print 'stopped by user'
+				break
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 	
+	def setup(self):
 		# ---------------- Part 1 ----------------
-		#initial step
+		#initial setup
 		self.robot.step()
 
 		# estimate the current formation with the localization module
@@ -70,43 +82,49 @@ class control():
 		# and calculate a minimal control graph (DEBUG OUTPUT, making sure to NOT do this calculation inside the loop)
 		print self.formation.setup_control_graph()
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def run(self):
 		# ---------------- Part 2 ---------------- 
 		# control loop
-		while True:
-		
-			# do environment stuff
-			#     communication
-			msg = com.get_new_msg()
-			#     get sensor data
-			local = loc.get_localization(self.robot, self.myPin)
+	
+		# do environment stuff
+		#     communication
+		msg = com.get_new_msg()
+		#     get sensor data
+		local = loc.get_localization(self.robot, self.myPin)
 
-			# interpret sensor data
-			#     update mission (new goals) from the gotten message
-			self.update_goals(msg)
-			#     get optimal position
-			(dx,dy) = self.get_opt_pos(local)
+		# interpret sensor data
+		#     update mission (new goals) from the gotten message
+		self.update_goals(msg)
+		#     get optimal position
+		(dx,dy) = self.get_opt_pos(local)
+	
+		if self.myPin == 3140 or self.myPin == 3306: #TODO remove this debug output
+			print 'Agent#',self.myPin,' opt_pos = ',(dx,dy)
 
-			# [optional] calculate course update
-			#     derive private (long term) goal from mission (general course)
-			#     get (mid term) goal from local sensing (obstacle avoidance)
-			#     choose formation correction from relative position
-			
-			# output motor speeds
-			(lmotor, rmotor) = self.get_motor_speeds((dx,dy))
+		# calculate course update (done in get_speed_vector)
+		#     derive private (long term) goal from mission (my final position)
+		#     get (mid term) goal from local sensing (obstacle avoidance) -> not_implemented
+		#     choose formation correction from relative position (from local)
+		v = self.get_speed_vector((dx,dy))
+#		print 'Agent#',self.myPin,' speed_v = ',v
 
-			print (lmotor, rmotor)
-
-			self.robot.step()
-			break
-		
+		# get and set motor speeds
+		(lmotor, rmotor) = self.get_motor_speeds(v)
+		self.robot.set_motors_speed(lmotor, rmotor);
+		self.robot.step()
+	
 		return
 	
-	
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
 	def show_formation(self):
 		print self.formation.get_graph()
 		print self.formation.get_IDmap()
 		return
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 	
 	def update_goals(self, msg):
 		# just a dummy function, because the communication is not implemented
@@ -123,6 +141,7 @@ class control():
 			# DO the fancy stuff here
 			return True
 
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 	
 	def determine_leader(self):
 		"""
@@ -170,14 +189,19 @@ class control():
 		else:
 			return min( top_candidates )
 
-
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 		
-	def	get_motor_speeds(self, target):
+	def	get_speed_vector(self, target, final_pos = None):
 		"""
 		returns the needed motor speeds of the robot in order to maintain formation
 		rtype: tuple
 		"""
 		target_pos = np.array(target)
+		
+		# if no final position is set, let the formation drive straight ahead
+		if(final_pos == None):
+			final_pos = target_pos
+
 
 		# get my robot type (leader, firstfollower, follower)		
 		lc = len(self.formation.get_agent_leaders(self.myPin))
@@ -187,9 +211,6 @@ class control():
 			me = 'c' # first follower
 		else:
 			me = 'f' # ordinary follower
-
-		# FIX to let the formation drive straight ahead
-		final_pos = target_pos
 
 		# step 1) get speed-vectors from the formula		
 		# ordinary follower:
@@ -213,9 +234,10 @@ class control():
 
 		if ( me == 'f' ):
 			if beta != 0: # prevent division by zero
-				v = MAX_SPD * beta * target_pos / dist
+				v = (MAX_SPD) * beta * target_pos / dist
 			else:
 				v = np.array([0,0])
+			print 'follower speed vector: ',v, '  beta: ',beta
 		elif ( me == 'c' ):
 			if beta != 0: # prevent division by zero
 				# maintain formation position speed
@@ -226,24 +248,40 @@ class control():
 				v = beta * v1 + math.sqrt(1-beta**2) * v2
 			else:
 				v = np.array([0,0])
+			#print 'firstfollower speed vector: ',v, '  beta: ',beta
 		elif (me == 'l'):
-			if beta_final != 0:
-				v = MAX_SPD * beta_final * (final_pos / np.linalg.norm(final_pos)) # note: in the case of the leader the final_pos is identical to the target_pos
+			if beta_final != 0: # TODO here i set a reduced maximum speed
+				v = (MAX_SPD*0.7) * beta_final * (final_pos / np.linalg.norm(final_pos)) # note: in the case of the leader the final_pos is identical to the target_pos
 			else:
 				v = np.array([0,0])
 
-		# step 2) calculate motor updates (evtl auslagern?)
-		
-		# hopefully smoother curve implementation for 2 motors
-		if ( v[0] != 0 ): # curve
-			r = (v[0]**2 + v[1]**2) / v[0]
-			spd_left  = np.linalg.norm(v) * np.sign(v[1]) * ( r+(WHEEL_DISTANCE/2) )/r
-			spd_right = np.linalg.norm(v) * np.sign(v[1]) * ( r-(WHEEL_DISTANCE/2) )/r
-		else: # driving straight
-			spd_left  = v[1]
-			spd_right = v[1]
+		return v
 
-		return (spd_left, spd_right)
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+	def get_motor_speeds(self, speed_vector):
+		# step 2) calculate motor updates		
+		# hopefully smoother curve implementation for 2 motors
+		# TODO sort out some small radii that result in a bad movement;
+		#print 'speedy:', speed_vector # TODO remove
+		if ( speed_vector[0] != 0 ): # curve
+
+			alpha = math.pi - 2*math.atan2(speed_vector[1],speed_vector[0])
+			d = np.linalg.norm(speed_vector) * math.pi / 1000 * (5*STEP_SIZE) * WHEEL_DIAMETER
+
+			r = d/alpha
+
+			if abs(r) < WHEEL_DIAMETER/2 or True:
+				spd_left  = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r+(WHEEL_DISTANCE/2) )/r
+				spd_right = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r-(WHEEL_DISTANCE/2) )/r
+			else:
+				spd_left  = speed_vector[1]
+				spd_right = speed_vector[1]
+		else: # drive straight
+			spd_left  = speed_vector[1]
+			spd_right = speed_vector[1]
+
+		return (round(spd_left), round(spd_right))
 
 #-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
 
@@ -258,49 +296,71 @@ class control():
 		else:
 			ref1 = 0 # first reference robot
 			ref2 = 1 # second reference robot
-			worst_case = False
 			while True: # calculate intersection of optimal distances
-				if worst_case: # there are no intersections
-					# drive towards the point halfway in between the first two leader-robots
-					a =  (local[leaders[ref1]][1]+local[leaders[ref2]][1])*0.5
-					b = -(local[leaders[ref1]][0]+local[leaders[ref2]][0])*0.5
-					c = 0
-				elif len(leaders) == 1 : # first follower
-					# TODO verify this solution
+				if len(leaders) == 1 : # first follower
 					# follow the mainleader 
-					a =  local[leaders[ref1]][1]
-					b = -local[leaders[ref1]][0]
+					a = local[leaders[ref1]][1]
+					b = local[leaders[ref1]][0]
 					c = 0
+#					print "coming from firstfollower, leader = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
 				elif len(leaders) >= 2 : # ordinary follower
 					# calc optimal position x and y from formula and localization of both leaders
-					# ------ the equation of the line of the intersections ax+by=c ------
-					a = 2*(local[leaders[ref2]][0] - local[leaders[ref1]][0])
-					b = 2*(local[leaders[ref2]][1] - local[leaders[ref1]][1])
-		
-					c = - ( local[leaders[ref1]][0]**2 + local[leaders[ref1]][1]**2 ) + self.formation.get_distance(self.myPin, leaders[ref1])**2 + (local[leaders[ref2]][0]**2 + local[leaders[ref2]][1]**2) - self.formation.get_distance(self.myPin, leaders[ref2])**2
+					# ------ the equation of the line of the intersections ax+by=c ------ # TODO check this!!
+					a = 2*(local[leaders[ref1]][0] - local[leaders[ref2]][0]) # same x on both leaders produces 0!!
+					b = 2*(local[leaders[ref1]][1] - local[leaders[ref2]][1])
+					c = (( local[leaders[ref1]][0]**2 + local[leaders[ref1]][1]**2 ) - self.formation.get_distance(self.myPin, leaders[ref1])**2 - (local[leaders[ref2]][0]**2 + local[leaders[ref2]][1]**2) + self.formation.get_distance(self.myPin, leaders[ref2])**2)
+					print "coming from ordinary follower"
+					print "leader1 = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
+					print "leader2 = ", (local[leaders[ref2]][0], local[leaders[ref2]][1])
 
-				# ------ polynomial function with  y^2*d + y*e + f = 0 ------
-				d = b**2 / a**2 + 1
-				e = (-2*c*b/a**2) + (2*b/a*local[leaders[ref1]][0]) + (-2*local[leaders[ref1]][1])
-				f = c**2/a**2 - 2*c/a*local[leaders[ref1]][0] + local[leaders[ref1]][0]**2 +local[leaders[ref1]][1]**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
+				if a != 0:
+					# ------ polynomial function with  y^2*d + y*e + f = 0 ------
+					#if self.myPin != 3139:
+					#	print "x = (",round(c/a,2),') - (' ,round(b/a,2),')*y'
+					d = 1 - b**2 / a**2
+					e = (-2*c*b/(a**2)) - (2*b/a*local[leaders[ref1]][0]) -2*local[leaders[ref1]][1]
+					f = c**2/a**2 - 2*c/a*local[leaders[ref1]][0] + local[leaders[ref1]][0]**2 +local[leaders[ref1]][1]**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
+				else:
+					#if self.myPin != 3139:
+					#	print "y = (",round(c/b,2),') - (' ,round(a/b,2),')*x'
+					d = 1 - a**2 / b**2
+					e = -2*c*a/(b**2) - 2*a/b*local[leaders[ref1]][1] -2*local[leaders[ref1]][0]
+					f = local[leaders[ref1]][0]**2 + (c/b - local[leaders[ref1]][1])**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
 
 				# ------ calculate both intersections from the quadratic equation ------
 				D = e**2-4*d*f
 				if D >= 0: # are there even intersections?
-					y1 = ( -e + math.sqrt(D) ) / (2*d)
-					x1 = (b*y1 - c) / a
-					y2 = ( -e - math.sqrt(D) ) / (2*d)
-					x2 = (b*y2 - c) / a
+					if a != 0:
+						if d != 0:
+							y1 = ( -e + math.sqrt(D) ) / (2*d)
+							y2 = ( -e - math.sqrt(D) ) / (2*d)
+						else:
+							y1 = y2 = -f/e
+						x1 = (c - b*y1) / a
+						x2 = (c - b*y2) / a
+					else:
+						if d != 0:
+							x1 = ( -e + math.sqrt(D) ) / (2*d)
+							x2 = ( -e - math.sqrt(D) ) / (2*d)
+						else:
+							x1 = x2 = -f/e
+						y1 = -(a*x1 - c) / b
+						y2 = -(a*x2 - c) / b
 					break # escape loop
 				else:
+					print len(leaders)
 					# if there is no intersection try again with another pair of leaders if possible (not the case for minimally persistent graphs)
-					if ( len(leaders) > ref1+2 ): #if there are alternative leader-circles try them
-						ref1 = ref1+1 
+					if ( len(leaders) > ref2+1 ): #if there are alternative leader-circles try them
+						ref1 = ref1+1
 						ref2 = ref2+1
-					elif ( len(leaders) == ref1+2 ):
+					elif ( len(leaders) == ref1+2 and ref1 != 0):
 						ref1 = 0
 					else: # there are no alternative leaders and we have no intersection;
-						worst_case = True
+						# drive towards the point halfway in between the first two leader-robots
+						print 'alternative!'
+						dy = (local[leaders[ref1]][1]+local[leaders[ref2]][1])*0.5
+						dx = (local[leaders[ref1]][0]+local[leaders[ref2]][0])*0.5
+						return (round(dx,2), round(dy,2))
 
 			# check which pair of coordinates is closer to me
 			if (y1**2+x1**2) > (y2**2+x2**2):

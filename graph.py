@@ -84,10 +84,8 @@ class graph():
 							# step 1) find the one leader (out-degree of 0)
 							# step 2) indentify the coleader (out-degree of 1 AND connection to the leader)
 							# step 3) every other vertex has to have at least 2 outgoing edges
-							if self.check_for_leader_follower() :
-								#TODO check for functionality
-								if (self.my_graph[(self.firstfollower_id, self.leader_id)] != 0) :
-									self.graph_is_persistent = True
+							if self.check_for_leader_follower() and (self.my_graph[(self.firstfollower_id, self.leader_id)] != 0) :
+								self.graph_is_persistent = True
 		return self.graph_is_persistent
 		
 

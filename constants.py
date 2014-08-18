@@ -2,9 +2,13 @@
 
 #MY_BT     = 1321  # not needed anymore
 MAX_SPD   =  500
-MIN_ERROR =    5
+MIN_ERROR =    2
+
+STEP_SIZE = 0.3
 
 WHEEL_DISTANCE = 5.3 # cm
+WHEEL_DIAMETER = 4.1 # cm
+# 1000 steps is about one revolution of the wheel
 
 # data taken from http://www.cyberbotics.com/dvd/common/doc/webots/guide/section8.1.html table8.4
 DICT_SENSOR_ANGLES = { # sensor_no : angle from the front of the robot in rad
