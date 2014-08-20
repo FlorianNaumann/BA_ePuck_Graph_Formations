@@ -237,21 +237,24 @@ class control():
 				v = (MAX_SPD) * beta * target_pos / dist
 			else:
 				v = np.array([0,0])
-			print 'follower speed vector: ',v, '  beta: ',beta
+			if FOLLOWER in DEBUG:
+				print 'follower speed vector: ',v, '  beta: ',beta
 		elif ( me == 'c' ):
 			if beta != 0: # prevent division by zero
 				# maintain formation position speed
 				v1 = MAX_SPD * target_pos / dist
 				# turn speed to get close to the final position
-				circle_vector = np.array([-target_pos[1], target_pos[0]])
-				v2 = MAX_SPD * beta_final * np.dot(circle_vector, final_pos) * (circle_vector / dist) # end_pos
+				circle_vector = np.array([target_pos[1], -target_pos[0]])
+				factor = np.dot(circle_vector, final_pos)
+				v2 = MAX_SPD * beta_final * factor * (circle_vector / dist) # end_pos
 				v = beta * v1 + math.sqrt(1-beta**2) * v2
 			else:
 				v = np.array([0,0])
-			#print 'firstfollower speed vector: ',v, '  beta: ',beta
+			if COLEADER in DEBUG:
+				print 'firstfollower speed vector: ',v, '  beta: ',beta
 		elif (me == 'l'):
 			if beta_final != 0: # TODO here i set a reduced maximum speed
-				v = (MAX_SPD*0.7) * beta_final * (final_pos / np.linalg.norm(final_pos)) # note: in the case of the leader the final_pos is identical to the target_pos
+				v = (MAX_SPD*CATCH_UP_FACTOR) * beta_final * (final_pos / np.linalg.norm(final_pos)) # note: in the case of the leader the final_pos is identical to the target_pos
 			else:
 				v = np.array([0,0])
 
@@ -267,16 +270,19 @@ class control():
 		if ( speed_vector[0] != 0 ): # curve
 
 			alpha = math.pi - 2*math.atan2(speed_vector[1],speed_vector[0])
-			d = np.linalg.norm(speed_vector) * math.pi / 1000 * (5*STEP_SIZE) * WHEEL_DIAMETER
+			d = np.linalg.norm(speed_vector) * math.pi / 1000 * (3*STEP_SIZE) * WHEEL_DIAMETER
 
 			r = d/alpha
+			
+			spd_left  = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r+(WHEEL_DISTANCE/2) )/r
+			spd_right = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r-(WHEEL_DISTANCE/2) )/r
 
-			if abs(r) < WHEEL_DIAMETER/2 or True:
-				spd_left  = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r+(WHEEL_DISTANCE/2) )/r
-				spd_right = np.linalg.norm(speed_vector) * math.copysign(1,speed_vector[1]) * ( r-(WHEEL_DISTANCE/2) )/r
-			else:
-				spd_left  = speed_vector[1]
-				spd_right = speed_vector[1]
+			if abs(r) < WHEEL_DIAMETER/2:
+				reduc = MAX_SPD/max(abs(spd_left) ,abs(spd_right))
+				print 'reduc=',reduc
+				spd_left = spd_left * reduc
+				spd_right = spd_right * reduc
+				print '########################### oi! ############################'
 		else: # drive straight
 			spd_left  = speed_vector[1]
 			spd_right = speed_vector[1]
@@ -300,37 +306,42 @@ class control():
 				if len(leaders) == 1 : # first follower
 					# follow the mainleader 
 					a = local[leaders[ref1]][1]
-					b = local[leaders[ref1]][0]
+					b = -local[leaders[ref1]][0]
 					c = 0
-#					print "coming from firstfollower, leader = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
+					if (COLEADER in DEBUG ):					
+						print "coming from firstfollower, leader = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
 				elif len(leaders) >= 2 : # ordinary follower
 					# calc optimal position x and y from formula and localization of both leaders
 					# ------ the equation of the line of the intersections ax+by=c ------ # TODO check this!!
-					a = 2*(local[leaders[ref1]][0] - local[leaders[ref2]][0]) # same x on both leaders produces 0!!
-					b = 2*(local[leaders[ref1]][1] - local[leaders[ref2]][1])
-					c = (( local[leaders[ref1]][0]**2 + local[leaders[ref1]][1]**2 ) - self.formation.get_distance(self.myPin, leaders[ref1])**2 - (local[leaders[ref2]][0]**2 + local[leaders[ref2]][1]**2) + self.formation.get_distance(self.myPin, leaders[ref2])**2)
-					print "coming from ordinary follower"
-					print "leader1 = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
-					print "leader2 = ", (local[leaders[ref2]][0], local[leaders[ref2]][1])
+					a = 2*(local[leaders[ref2]][0] - local[leaders[ref1]][0])
+					b = 2*(local[leaders[ref2]][1] - local[leaders[ref1]][1])
+					c = -(local[leaders[ref1]][0]**2 + local[leaders[ref1]][1]**2  - self.formation.get_distance(self.myPin, leaders[ref1])**2 - local[leaders[ref2]][0]**2 - local[leaders[ref2]][1]**2 + self.formation.get_distance(self.myPin, leaders[ref2])**2)
+					if (FOLLOWER in DEBUG ):				
+						print "coming from ordinary follower"
+						print "leader1 = ", (local[leaders[ref1]][0], local[leaders[ref1]][1])
+						print "leader2 = ", (local[leaders[ref2]][0], local[leaders[ref2]][1])
 
-				if a != 0:
+				if b== 0:
 					# ------ polynomial function with  y^2*d + y*e + f = 0 ------
-					#if self.myPin != 3139:
-					#	print "x = (",round(c/a,2),') - (' ,round(b/a,2),')*y'
-					d = 1 - b**2 / a**2
-					e = (-2*c*b/(a**2)) - (2*b/a*local[leaders[ref1]][0]) -2*local[leaders[ref1]][1]
-					f = c**2/a**2 - 2*c/a*local[leaders[ref1]][0] + local[leaders[ref1]][0]**2 +local[leaders[ref1]][1]**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
+					if self.myPin != 3139 or COLEADER in DEBUG:
+						print "x = (",round(c/a,2),') - (' ,round(b/a,2),')*y'
+					d = 1 + b**2 / a**2
+					e = (-2*c*b/(a**2)) + (2*b/a*local[leaders[ref1]][0]) -2*local[leaders[ref1]][1]
+					f = (c/a - local[leaders[ref1]][1])**2 +local[leaders[ref1]][0]**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
 				else:
-					#if self.myPin != 3139:
-					#	print "y = (",round(c/b,2),') - (' ,round(a/b,2),')*x'
-					d = 1 - a**2 / b**2
-					e = -2*c*a/(b**2) - 2*a/b*local[leaders[ref1]][1] -2*local[leaders[ref1]][0]
+					if self.myPin != 3139 or COLEADER in DEBUG:
+						print "y = (",round(c/b,2),') - (' ,round(a/b,2),')*x'
+					d = 1 + a**2 / b**2
+					e = -2*c*a/(b**2) + 2*a/b*local[leaders[ref1]][1] -2*local[leaders[ref1]][0]
 					f = local[leaders[ref1]][0]**2 + (c/b - local[leaders[ref1]][1])**2 - self.formation.get_distance(self.myPin, leaders[ref1])**2
 
 				# ------ calculate both intersections from the quadratic equation ------
 				D = e**2-4*d*f
+#				print 'diskriminante: ', D
+#				print 'a=',a,', b=',b,', c=',c
+#				print 'd=',d,', e=',e,', f=',f
 				if D >= 0: # are there even intersections?
-					if a != 0:
+					if b== 0:
 						if d != 0:
 							y1 = ( -e + math.sqrt(D) ) / (2*d)
 							y2 = ( -e - math.sqrt(D) ) / (2*d)
@@ -344,11 +355,11 @@ class control():
 							x2 = ( -e - math.sqrt(D) ) / (2*d)
 						else:
 							x1 = x2 = -f/e
-						y1 = -(a*x1 - c) / b
-						y2 = -(a*x2 - c) / b
+						y1 = (c - a*x1) / b
+						y2 = (c - a*x2) / b
 					break # escape loop
 				else:
-					print len(leaders)
+					print 'number of leaders:', len(leaders)
 					# if there is no intersection try again with another pair of leaders if possible (not the case for minimally persistent graphs)
 					if ( len(leaders) > ref2+1 ): #if there are alternative leader-circles try them
 						ref1 = ref1+1
@@ -357,7 +368,7 @@ class control():
 						ref1 = 0
 					else: # there are no alternative leaders and we have no intersection;
 						# drive towards the point halfway in between the first two leader-robots
-						print 'alternative!'
+#						print 'alternative!'
 						dy = (local[leaders[ref1]][1]+local[leaders[ref2]][1])*0.5
 						dx = (local[leaders[ref1]][0]+local[leaders[ref2]][0])*0.5
 						return (round(dx,2), round(dy,2))
@@ -369,6 +380,9 @@ class control():
 			else:
 				dx = x1
 				dy = y1
+
+		if (COLEADER in DEBUG or FOLLOWER in DEBUG):
+			print (round(dx,2), round(dy,2))
 
 		return (round(dx,2), round(dy,2))
 
